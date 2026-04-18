@@ -7,22 +7,22 @@ class BaseConfig:
     EXCHANGERATE_BASE_URL = "https://api.exchangerate.host"
     RATELIMIT_DEFAULT = "60 per minute"
     RATELIMIT_STORAGE_URI = "memory://"
-    # Cache – výsledky kurzů platí 20 minut
+    # Cache — výchozí 20 minut (NFR: 10–30 minut)
     CACHE_TYPE = "SimpleCache"
-    CACHE_DEFAULT_TIMEOUT = 1200  # 20 minut
+    CACHE_DEFAULT_TIMEOUT = 1200
 
 
 class DevelopmentConfig(BaseConfig):
     DEBUG = True
     TESTING = False
-    CACHE_DEFAULT_TIMEOUT = 60  # kratší cache při vývoji
+    CACHE_DEFAULT_TIMEOUT = 300  # 5 minut při vývoji
 
 
 class TestingConfig(BaseConfig):
     DEBUG = True
     TESTING = True
     RATELIMIT_ENABLED = False
-    CACHE_TYPE = "NullCache"  # cache vypnutá v testech
+    CACHE_TYPE = "NullCache"   # cache vypnutá v testech
 
 
 class ProductionConfig(BaseConfig):
