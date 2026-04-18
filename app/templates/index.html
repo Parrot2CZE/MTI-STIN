@@ -50,6 +50,7 @@
             <p class="text-muted mb-1">💪 Nejsilnější vůči {{ result.base }}</p>
             <h3 class="text-success fw-bold">{{ result.strongest.currency }}</h3>
             <p class="mb-0">1 {{ result.base }} = <strong>{{ "%.4f"|format(result.strongest.rate) }}</strong> {{ result.strongest.currency }}</p>
+            <small class="text-muted">Za 1 {{ result.base }} dostanete nejméně — {{ result.strongest.currency }} je nejcennější</small>
           </div>
         </div>
       </div>
@@ -59,6 +60,7 @@
             <p class="text-muted mb-1">📉 Nejslabší vůči {{ result.base }}</p>
             <h3 class="text-danger fw-bold">{{ result.weakest.currency }}</h3>
             <p class="mb-0">1 {{ result.base }} = <strong>{{ "%.4f"|format(result.weakest.rate) }}</strong> {{ result.weakest.currency }}</p>
+            <small class="text-muted">Za 1 {{ result.base }} dostanete nejvíce — {{ result.weakest.currency }} je nejlevnější</small>
           </div>
         </div>
       </div>

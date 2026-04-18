@@ -35,6 +35,18 @@ def test_index_post_no_symbols(client):
     assert "Vyber alespoň jednu měnu".encode("utf-8") in r.data
 
 
+def test_index_post_invalid_days_string(client):
+    r = client.post("/", data={"base": "CZK", "symbols": ["EUR"], "days": "abc"})
+    assert r.status_code == 200
+    assert "celé číslo".encode("utf-8") in r.data
+
+
+def test_index_post_days_out_of_range(client):
+    r = client.post("/", data={"base": "CZK", "symbols": ["EUR"], "days": "400"})
+    assert r.status_code == 200
+    assert "365".encode("utf-8") in r.data
+
+
 @rsps_lib.activate
 def test_index_post_api_error(client):
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", status=500)

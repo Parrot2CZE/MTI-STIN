@@ -19,10 +19,19 @@ def index():
     if request.method == "POST":
         base = request.form.get("base", "USD").upper()
         selected = request.form.getlist("symbols")
-        days = int(request.form.get("days", 7))
+
+        try:
+            days = int(request.form.get("days", 7))
+        except ValueError:
+            flash("Počet dní musí být celé číslo.", "warning")
+            return render_template("index.html", **context)
 
         if not selected:
             flash("Vyber alespoň jednu měnu.", "warning")
+            return render_template("index.html", **context)
+
+        if days < 1 or days > 365:
+            flash("Počet dní musí být v rozsahu 1–365.", "warning")
             return render_template("index.html", **context)
 
         svc = ExchangeRateService()

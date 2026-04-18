@@ -17,9 +17,10 @@ def create_app(config_name: str = None) -> Flask:
     else:
         app.config.from_object("app.config.ProductionConfig")
 
-    # Rate limiting
-    from app.extensions import limiter
+    # Extensions
+    from app.extensions import limiter, cache
     limiter.init_app(app)
+    cache.init_app(app)
 
     # Blueprints
     from app.routes import main_bp
