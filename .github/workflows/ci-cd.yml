@@ -85,12 +85,11 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_1FF21008CA9E4EF5BAA243B3F6F8417B }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_6E442F70FC17491BA11B210ED78FA17E }}
 
-      - name: Nastavení proměnných prostředí na Azure
-        run: |
-          az webapp config appsettings set \
-            --name "STIN-exchange-rate" \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --settings EXCHANGERATE_API_KEY=${{ secrets.EXCHANGERATE_API_KEY }}
+      - name: Nastavení API klíče na Azure
+        uses: azure/appservice-settings@v1
+        with:
+          app-name: "STIN-exchange-rate"
+          app-settings-json: '[{"name": "EXCHANGERATE_API_KEY", "value": "${{ secrets.EXCHANGERATE_API_KEY }}", "slotSetting": false}]'
 
       - name: Deploy na Azure Web App
         uses: azure/webapps-deploy@v3
