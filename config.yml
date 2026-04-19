@@ -1,0 +1,49 @@
+# Konfigurace měnové aplikace
+# -------------------------------------------------------
+# Zde můžeš upravovat dostupné měny a chování aplikace.
+
+currencies:
+  # Měny dostupné jako Základní měna (base)
+  base:
+    - USD
+    - EUR
+    - GBP
+    - CZK
+    - CHF
+    - JPY
+    - PLN
+    - HUF
+    - CAD
+    - AUD
+    - SEK
+    - NOK
+    - DKK
+    - CNY
+    - INR
+
+  # Měny dostupné v seznamu Porovnávané měny
+  compare:
+    - USD
+    - EUR
+    - GBP
+    - JPY
+    - CHF
+    - CZK
+    - PLN
+    - HUF
+    - CAD
+    - AUD
+    - SEK
+    - NOK
+    - DKK
+    - CNY
+    - INR
+
+cache:
+  # Jak dlouho cachovat kurzy v sekundách (výchozí: 1200 = 20 minut)
+  timeout_seconds: 1200
+
+performance:
+  # Počet paralelních vláken pro stahování historických dat
+  # Vyšší = rychlejší, ale více souběžných API requestů
+  historical_threads: 7

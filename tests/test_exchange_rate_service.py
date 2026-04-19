@@ -40,11 +40,12 @@ FAKE_HISTORICAL = {
     "rates": {"EUR": 0.91, "CZK": 23.1, "JPY": 148.5},
 }
 
-FAKE_HISTORICAL_EUR_BASE = {
+# /historical pro base=EUR — API vrátí USD quotes stejně jako /live
+# Obsahuje EUR aby byl možný cross-rate přepočet
+FAKE_HISTORICAL_USD_WITH_EUR = {
     "success": True,
     "historical": True,
-    "base": "EUR",
-    "rates": {"CZK": 25.3, "GBP": 0.86},
+    "quotes": {"USDEUR": 0.92, "USDCZK": 23.5, "USDGBP": 0.79},
 }
 
 FAKE_HISTORICAL_WITH_PREFIX = {
@@ -164,7 +165,37 @@ def test_get_latest_eur_base_excludes_base_from_result():
 
 
 @rsps_lib.activate
-def test_get_latest_missing_base_in_response_raises():
+def test_get_latest_usd_in_symbols_when_base_is_czk():
+    """
+    base=CZK, symbols=[USD, GBP]:
+    API nevrátí USDUSD → USD se dopočítá jako 1 / usd_to_czk.
+    1 CZK = 1/23.5 USD ≈ 0.04255
+    """
+    rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live",
+                 json={"success": True, "quotes": {"USDCZK": 23.5, "USDGBP": 0.79}})
+    svc = ExchangeRateService()
+    data = svc.get_latest("CZK", ["USD", "GBP"])
+    rates = data["rates"]
+    assert "USD" in rates
+    assert abs(rates["USD"] - (1.0 / 23.5)) < 0.001
+    assert "GBP" in rates
+
+
+@rsps_lib.activate
+def test_average_rates_usd_in_symbols_non_usd_base():
+    """
+    base=CZK, symbols=[USD, EUR]: USD se dopočítá jako 1 / usd_to_czk.
+    """
+    rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/historical",
+                 json={"success": True, "quotes": {"USDCZK": 23.5, "USDEUR": 0.92}})
+    svc = ExchangeRateService()
+    averages = svc.average_rates("CZK", ["USD", "EUR"], days=2)
+    assert "USD" in averages
+    assert abs(averages["USD"] - (1.0 / 23.5)) < 0.001
+    assert "EUR" in averages
+
+
+
     """Pokud API nevrátí kurz pro base měnu, vyhodí ExchangeRateError."""
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live",
                  json={"success": True, "quotes": {"USDCZK": 23.5}})
@@ -187,14 +218,29 @@ def test_get_historical_usd_base():
 
 
 @rsps_lib.activate
-def test_get_historical_eur_base():
-    """historical respektuje base parametr — vrací čisté klíče."""
+def test_get_historical_eur_base_cross_rate():
+    """
+    base=EUR: historical taky vrací USD quotes → cross-rate přepočet.
+    EUR→CZK = USDCZK / USDEUR = 23.5 / 0.92 ≈ 25.54
+    EUR→GBP = USDGBP / USDEUR = 0.79 / 0.92 ≈ 0.858
+    """
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/historical",
-                 json=FAKE_HISTORICAL_EUR_BASE)
+                 json=FAKE_HISTORICAL_USD_WITH_EUR)
     svc = ExchangeRateService()
     data = svc.get_historical(date(2024, 1, 15), "EUR", ["CZK", "GBP"])
-    assert abs(data["rates"]["CZK"] - 25.3) < 0.001
-    assert abs(data["rates"]["GBP"] - 0.86) < 0.001
+    assert abs(data["rates"]["CZK"] - (23.5 / 0.92)) < 0.01
+    assert abs(data["rates"]["GBP"] - (0.79 / 0.92)) < 0.01
+    assert "EUR" not in data["rates"]
+
+
+@rsps_lib.activate
+def test_get_historical_missing_base_raises():
+    """Pokud API nevrátí kurz base měny, vyhodí ExchangeRateError."""
+    rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/historical",
+                 json={"success": True, "quotes": {"USDCZK": 23.5}})
+    svc = ExchangeRateService()
+    with pytest.raises(ExchangeRateError, match="EUR"):
+        svc.get_historical(date(2024, 1, 15), "EUR", ["CZK"])
 
 
 @rsps_lib.activate
@@ -299,6 +345,17 @@ def test_weakest_empty_rates_raises():
 # ------------------------------------------------------------------
 
 @rsps_lib.activate
+def test_average_rates_base_currency_in_symbols_returns_1():
+    """Pokud je base měna v symbols (např. USD v USD), vrátí se 1.0."""
+    rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/historical",
+                 json=FAKE_HISTORICAL)
+    svc = ExchangeRateService()
+    averages = svc.average_rates("USD", ["USD", "EUR"], days=2)
+    assert averages["USD"] == 1.0
+    assert "EUR" in averages
+
+
+@rsps_lib.activate
 def test_average_rates_usd_base():
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/historical",
                  json=FAKE_HISTORICAL)
@@ -311,13 +368,16 @@ def test_average_rates_usd_base():
 
 @rsps_lib.activate
 def test_average_rates_eur_base():
-    """historical respektuje base=EUR, takže průměr funguje bez cross-rate."""
+    """
+    base=EUR: historical vrátí USD quotes → cross-rate přepočet.
+    EUR→CZK = 23.5 / 0.92 ≈ 25.54
+    """
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/historical",
-                 json=FAKE_HISTORICAL_EUR_BASE)
+                 json=FAKE_HISTORICAL_USD_WITH_EUR)
     svc = ExchangeRateService()
     averages = svc.average_rates("EUR", ["CZK", "GBP"], days=2)
     assert "CZK" in averages
-    assert abs(averages["CZK"] - 25.3) < 0.01
+    assert abs(averages["CZK"] - (23.5 / 0.92)) < 0.01
 
 
 @rsps_lib.activate

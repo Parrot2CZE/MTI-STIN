@@ -1,23 +1,23 @@
 from flask import Blueprint, render_template, request, flash
 from app.services import ExchangeRateService, ExchangeRateError
+from app.app_config_loader import get_base_currencies, get_compare_currencies
 
 main_bp = Blueprint("main", __name__)
-
-AVAILABLE_CURRENCIES = [
-    "USD", "EUR", "GBP", "JPY", "CHF", "CZK", "PLN", "HUF",
-    "CAD", "AUD", "SEK", "NOK", "DKK", "CNY", "INR",
-]
 
 
 @main_bp.route("/", methods=["GET", "POST"])
 def index():
+    base_currencies = get_base_currencies()
+    compare_currencies = get_compare_currencies()
+
     context = {
-        "currencies": AVAILABLE_CURRENCIES,
+        "base_currencies": base_currencies,
+        "compare_currencies": compare_currencies,
         "result": None,
     }
 
     if request.method == "POST":
-        base = request.form.get("base", "USD").upper()
+        base = request.form.get("base", base_currencies[0]).upper()
         selected = request.form.getlist("symbols")
 
         try:
