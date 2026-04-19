@@ -3,11 +3,8 @@ from app.app_config_loader import get_cache_timeout, get_rate_limit_default, get
 
 
 class BaseConfig:
-    # Tajné hodnoty — pouze z prostředí, nikdy z config.yml
     SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
-    EXCHANGERATE_API_KEY = os.getenv("EXCHANGERATE_API_KEY", "")
-
-    # Vše ostatní z config.yml
+    # API klíč se čte přes get_exchangerate_api_key() v services, ne zde
     EXCHANGERATE_BASE_URL = get_api_base_url()
     RATELIMIT_DEFAULT = get_rate_limit_default()
     RATELIMIT_STORAGE_URI = "memory://"

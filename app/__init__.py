@@ -16,10 +16,17 @@ def create_app(config_name: str = None) -> Flask:
     else:
         app.config.from_object("app.config.ProductionConfig")
 
-    from app.extensions import limiter, cache
+    # Extensions
+    from app.extensions import limiter, cache, cors
     limiter.init_app(app)
     cache.init_app(app)
+    cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
 
+    # In-memory logger
+    from app.logger import setup_logger
+    setup_logger(app)
+
+    # Blueprints
     from app.routes import main_bp
     app.register_blueprint(main_bp)
 

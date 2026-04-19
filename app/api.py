@@ -1,13 +1,25 @@
-from flask import Blueprint, jsonify, request
+from functools import wraps
+from flask import Blueprint, jsonify, request, session
 from app.services import ExchangeRateService, ExchangeRateError
 from app.extensions import limiter, cache
 from app.app_config_loader import get_cache_timeout
+from app.logger import get_logs
 
 api_bp = Blueprint("api", __name__)
 
 
 def _svc() -> ExchangeRateService:
     return ExchangeRateService()
+
+
+def login_required_api(f):
+    """Dekorátor — vrátí 401 pokud uživatel není přihlášen."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user" not in session:
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated
 
 
 @api_bp.route("/latest")
@@ -75,3 +87,11 @@ def average():
         return jsonify({"success": True, "base": base, "days": days, "averages": averages})
     except ExchangeRateError as exc:
         return jsonify({"success": False, "error": str(exc)}), 502
+
+
+@api_bp.route("/logs")
+@login_required_api
+@limiter.limit("20 per minute")
+def logs():
+    """Vrátí in-memory logy. Přístupný pouze přihlášeným uživatelům."""
+    return jsonify({"success": True, "logs": get_logs()})

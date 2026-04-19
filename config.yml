@@ -1,8 +1,20 @@
 # Konfigurace měnové aplikace
-# Tajné hodnoty (SECRET_KEY, EXCHANGERATE_API_KEY) patří do .env, ne sem.
+# --------------------------------------------------
+# API klíče: pokud jsou vyplněny zde, mají přednost před env proměnnými.
+# Pro produkci doporučujeme nechat prázdné a použít env / GitHub Secrets.
+
+api_keys:
+  exchangerate: ""          # pokud prázdné, použije se EXCHANGERATE_API_KEY z env
+
+# Uživatelé pro Basic Auth
+# Hesla jsou hashovaná bcryptem — pro vygenerování hashe spusť:
+#   python -c "import bcrypt; print(bcrypt.hashpw(b'heslo', bcrypt.gensalt()).decode())"
+users:
+  - username: admin
+    # výchozí heslo: admin123
+    password_hash: "$2b$12$AToDNTBMeFOe.9yrRfbAyunxh7Shta0BP9djVEJmnLdDi789Qu3G."
 
 currencies:
-  # Měny dostupné jako Základní měna
   base:
     - USD
     - EUR
@@ -19,8 +31,6 @@ currencies:
     - DKK
     - CNY
     - INR
-
-  # Měny dostupné v seznamu Porovnávané měny
   compare:
     - USD
     - EUR
@@ -39,11 +49,78 @@ currencies:
     - INR
 
 cache:
-  timeout_seconds: 1200       # aktuální kurzy — 20 minut
-  timeout_seconds_dev: 300    # při vývoji — 5 minut
+  timeout_seconds: 1200
+  timeout_seconds_dev: 300
 
 rate_limit:
   default: "60 per minute"
+  # Cooldown tlačítka "Zobrazit kurzy" v sekundách
+  button_cooldown_seconds: 60
 
 api:
   base_url: "https://api.exchangerate.host"
+
+# Překlady UI — cs / en
+i18n:
+  cs:
+    title: "Měnové kurzy"
+    settings: "Nastavení"
+    base_currency: "Základní měna"
+    compare_currencies: "Porovnávané měny"
+    days_label: "Průměr za posledních N dní"
+    submit: "Zobrazit kurzy"
+    loading: "Načítám…"
+    strongest: "Nejsilnější vůči"
+    weakest: "Nejslabší vůči"
+    avg_table_header: "Průměrné kurzy za"
+    avg_table_days: "dní"
+    col_currency: "Měna"
+    col_avg: "Průměrný kurz"
+    col_trend: "Trend"
+    badge_strongest: "nejsilnější"
+    badge_weakest: "nejslabší"
+    placeholder: "Vyber měny a klikni na Zobrazit kurzy"
+    err_no_symbols: "Vyber alespoň jednu měnu."
+    err_days_int: "Počet dní musí být celé číslo."
+    err_days_range: "Počet dní musí být v rozsahu 1–365."
+    err_api: "Chyba při načítání kurzů"
+    login_title: "Přihlášení"
+    login_username: "Uživatelské jméno"
+    login_password: "Heslo"
+    login_submit: "Přihlásit se"
+    login_error: "Nesprávné jméno nebo heslo."
+    logout: "Odhlásit"
+    logs_title: "Systémové logy"
+    logs_empty: "Žádné záznamy."
+    nav_logs: "Logy"
+  en:
+    title: "Exchange Rates"
+    settings: "Settings"
+    base_currency: "Base currency"
+    compare_currencies: "Compare currencies"
+    days_label: "Average over last N days"
+    submit: "Show rates"
+    loading: "Loading…"
+    strongest: "Strongest vs"
+    weakest: "Weakest vs"
+    avg_table_header: "Average rates over"
+    avg_table_days: "days"
+    col_currency: "Currency"
+    col_avg: "Average rate"
+    col_trend: "Trend"
+    badge_strongest: "strongest"
+    badge_weakest: "weakest"
+    placeholder: "Select currencies and click Show rates"
+    err_no_symbols: "Select at least one currency."
+    err_days_int: "Number of days must be an integer."
+    err_days_range: "Number of days must be between 1 and 365."
+    err_api: "Error fetching rates"
+    login_title: "Login"
+    login_username: "Username"
+    login_password: "Password"
+    login_submit: "Log in"
+    login_error: "Invalid username or password."
+    logout: "Log out"
+    logs_title: "System logs"
+    logs_empty: "No records."
+    nav_logs: "Logs"

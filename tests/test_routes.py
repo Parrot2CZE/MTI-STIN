@@ -15,42 +15,64 @@ FAKE_TIMEFRAME = {
 }
 
 
-def test_index_get(client):
-    r = client.get("/")
+def test_index_redirects_when_not_logged_in(client):
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 302
+    assert "login" in r.headers["Location"]
+
+
+def test_login_page_loads(client):
+    r = client.get("/login")
     assert r.status_code == 200
-    assert "Měnové kurzy".encode() in r.data
+
+
+def test_index_get_when_logged_in(auth_client):
+    r = auth_client.get("/")
+    assert r.status_code == 200
+    assert "Měnové kurzy".encode() in r.data or "Exchange Rates".encode() in r.data
 
 
 @rsps_lib.activate
-def test_index_post_valid(client):
+def test_index_post_valid(auth_client):
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", json=FAKE_LIVE)
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/timeframe", json=FAKE_TIMEFRAME)
-    r = client.post("/", data={"base": "USD", "symbols": ["EUR", "CZK"], "days": "2"})
+    r = auth_client.post("/", data={"base": "USD", "symbols": ["EUR", "CZK"], "days": "2"})
     assert r.status_code == 200
     assert b"EUR" in r.data
 
 
-def test_index_post_no_symbols(client):
-    r = client.post("/", data={"base": "USD", "symbols": [], "days": "7"})
+def test_index_post_no_symbols(auth_client):
+    r = auth_client.post("/", data={"base": "USD", "symbols": [], "days": "7"})
     assert r.status_code == 200
-    assert "Vyber alespoň jednu měnu".encode("utf-8") in r.data
+    # Zpráva může být v češtině nebo angličtině podle session
+    assert "alespoň".encode("utf-8") in r.data or b"least" in r.data
 
 
-def test_index_post_invalid_days_string(client):
-    r = client.post("/", data={"base": "USD", "symbols": ["EUR"], "days": "abc"})
+def test_index_post_invalid_days_string(auth_client):
+    r = auth_client.post("/", data={"base": "USD", "symbols": ["EUR"], "days": "abc"})
     assert r.status_code == 200
-    assert "celé číslo".encode("utf-8") in r.data
+    assert "celé číslo".encode("utf-8") in r.data or b"integer" in r.data
 
 
-def test_index_post_days_out_of_range(client):
-    r = client.post("/", data={"base": "USD", "symbols": ["EUR"], "days": "400"})
+def test_index_post_days_out_of_range(auth_client):
+    r = auth_client.post("/", data={"base": "USD", "symbols": ["EUR"], "days": "400"})
     assert r.status_code == 200
     assert "365".encode("utf-8") in r.data
 
 
 @rsps_lib.activate
-def test_index_post_api_error(client):
+def test_index_post_api_error(auth_client):
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", status=500)
-    r = client.post("/", data={"base": "USD", "symbols": ["EUR"], "days": "7"})
+    r = auth_client.post("/", data={"base": "USD", "symbols": ["EUR"], "days": "7"})
     assert r.status_code == 200
-    assert "Chyba".encode("utf-8") in r.data
+    assert "Chyba".encode("utf-8") in r.data or b"Error" in r.data
+
+
+def test_lang_switch_cs(auth_client):
+    r = auth_client.get("/lang/cs", follow_redirects=True)
+    assert r.status_code == 200
+
+
+def test_lang_switch_en(auth_client):
+    r = auth_client.get("/lang/en", follow_redirects=True)
+    assert r.status_code == 200

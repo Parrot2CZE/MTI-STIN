@@ -4,11 +4,11 @@
 <div class="row">
   <div class="col-md-4">
     <div class="card shadow-sm">
-      <div class="card-header bg-primary text-white">Nastavení</div>
+      <div class="card-header bg-primary text-white">{{ t.settings }}</div>
       <div class="card-body">
         <form method="POST" id="main-form">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Základní měna</label>
+            <label class="form-label fw-semibold">{{ t.base_currency }}</label>
             <select name="base" class="form-select">
               {% for c in base_currencies %}
                 <option value="{{ c }}" {% if result and result.base == c %}selected{% endif %}>{{ c }}</option>
@@ -17,7 +17,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label fw-semibold">Porovnávané měny</label>
+            <label class="form-label fw-semibold">{{ t.compare_currencies }}</label>
             <div style="max-height:220px; overflow-y:auto; border:1px solid #dee2e6; border-radius:.375rem; padding:.5rem">
               {% for c in compare_currencies %}
                 <div class="form-check">
@@ -30,18 +30,19 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label fw-semibold">Průměr za posledních N dní</label>
+            <label class="form-label fw-semibold">{{ t.days_label }}</label>
             <input type="number" name="days" class="form-control" min="1" max="365"
               value="{{ result.days if result else 7 }}">
           </div>
 
           <button class="btn btn-primary w-100" id="submit-btn">
-            <span id="btn-text">Zobrazit kurzy</span>
+            <span id="btn-text">{{ t.submit }}</span>
             <span id="btn-spinner" class="d-none">
               <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-              Načítám…
+              {{ t.loading }}
             </span>
           </button>
+          <div id="cooldown-msg" class="text-muted small text-center mt-1 d-none"></div>
         </form>
       </div>
     </div>
@@ -53,7 +54,7 @@
       <div class="col-sm-6">
         <div class="card border-success h-100">
           <div class="card-body text-center">
-            <p class="text-muted mb-1">Nejsilnější vůči {{ result.base }}</p>
+            <p class="text-muted mb-1">{{ t.strongest }} {{ result.base }}</p>
             <h3 class="text-success fw-bold">{{ result.strongest.currency }}</h3>
             <p class="mb-0">1 {{ result.base }} = <strong>{{ "%.4f"|format(result.strongest.rate) }}</strong> {{ result.strongest.currency }}</p>
           </div>
@@ -62,7 +63,7 @@
       <div class="col-sm-6">
         <div class="card border-danger h-100">
           <div class="card-body text-center">
-            <p class="text-muted mb-1">Nejslabší vůči {{ result.base }}</p>
+            <p class="text-muted mb-1">{{ t.weakest }} {{ result.base }}</p>
             <h3 class="text-danger fw-bold">{{ result.weakest.currency }}</h3>
             <p class="mb-0">1 {{ result.base }} = <strong>{{ "%.4f"|format(result.weakest.rate) }}</strong> {{ result.weakest.currency }}</p>
           </div>
@@ -70,12 +71,21 @@
       </div>
     </div>
 
+    <!-- Graf průměrných kurzů -->
+    <div class="card shadow-sm mb-3">
+      <div class="card-header">{{ t.avg_table_header }} {{ result.days }} {{ t.avg_table_days }}</div>
+      <div class="card-body">
+        <canvas id="ratesChart" height="140"></canvas>
+      </div>
+    </div>
+
+    <!-- Tabulka -->
     <div class="card shadow-sm">
-      <div class="card-header">Průměrné kurzy za {{ result.days }} dní</div>
+      <div class="card-header">{{ t.avg_table_header }} {{ result.days }} {{ t.avg_table_days }}</div>
       <div class="card-body p-0">
         <table class="table table-striped table-hover mb-0">
           <thead class="table-light">
-            <tr><th>Měna</th><th>Průměrný kurz</th><th>Trend</th></tr>
+            <tr><th>{{ t.col_currency }}</th><th>{{ t.col_avg }}</th><th>{{ t.col_trend }}</th></tr>
           </thead>
           <tbody>
             {% for currency, avg in result.averages.items() | sort(attribute='1') %}
@@ -84,9 +94,9 @@
               <td>{{ "%.4f"|format(avg) }}</td>
               <td>
                 {% if currency == result.strongest.currency %}
-                  <span class="badge bg-success">nejsilnější</span>
+                  <span class="badge bg-success">{{ t.badge_strongest }}</span>
                 {% elif currency == result.weakest.currency %}
-                  <span class="badge bg-danger">nejslabší</span>
+                  <span class="badge bg-danger">{{ t.badge_weakest }}</span>
                 {% endif %}
               </td>
             </tr>
@@ -97,17 +107,104 @@
     </div>
     {% else %}
     <div class="text-center text-muted mt-5">
-      <p class="fs-4">Vyber měny a klikni na <em>Zobrazit kurzy</em></p>
+      <p class="fs-4">{{ t.placeholder }}</p>
     </div>
     {% endif %}
   </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-  document.getElementById('main-form').addEventListener('submit', function () {
+(function () {
+  // Cooldown tlačítka
+  const COOLDOWN = {{ cooldown }};
+  const btn = document.getElementById('submit-btn');
+  const msg = document.getElementById('cooldown-msg');
+  const form = document.getElementById('main-form');
+  let cooldownActive = false;
+
+  form.addEventListener('submit', function (e) {
+    if (cooldownActive) { e.preventDefault(); return; }
     document.getElementById('btn-text').classList.add('d-none');
     document.getElementById('btn-spinner').classList.remove('d-none');
-    document.getElementById('submit-btn').disabled = true;
+    btn.disabled = true;
+    cooldownActive = true;
+
+    let remaining = COOLDOWN;
+    const interval = setInterval(() => {
+      remaining--;
+      msg.textContent = remaining > 0 ? remaining + 's' : '';
+      msg.classList.toggle('d-none', remaining <= 0);
+      if (remaining <= 0) {
+        clearInterval(interval);
+        btn.disabled = false;
+        cooldownActive = false;
+        document.getElementById('btn-text').classList.remove('d-none');
+        document.getElementById('btn-spinner').classList.add('d-none');
+      }
+    }, 1000);
   });
+
+  // Graf
+  {% if result and result.daily %}
+  const daily = {{ result.daily | tojson }};
+  const allDays = Object.keys(daily).sort();
+  const currencies = {{ result.averages.keys() | list | tojson }};
+
+  // Paleta barev pro čáry
+  const palette = [
+    'rgba(13,110,253,0.9)',
+    'rgba(25,135,84,0.9)',
+    'rgba(220,53,69,0.9)',
+    'rgba(255,193,7,0.9)',
+    'rgba(13,202,240,0.9)',
+    'rgba(111,66,193,0.9)',
+    'rgba(253,126,20,0.9)',
+    'rgba(102,16,242,0.9)',
+  ];
+
+  const datasets = currencies.map((cur, i) => ({
+    label: cur,
+    data: allDays.map(d => daily[d]?.[cur] ?? null),
+    borderColor: palette[i % palette.length],
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    pointRadius: allDays.length <= 14 ? 4 : 2,
+    pointHoverRadius: 6,
+    tension: 0.3,
+    spanGaps: true,
+  }));
+
+  new Chart(document.getElementById('ratesChart'), {
+    type: 'line',
+    data: { labels: allDays, datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 12 } } },
+        tooltip: { callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(4) ?? 'N/A'}`
+        }}
+      },
+      scales: {
+        x: {
+          ticks: {
+            maxTicksLimit: 10,
+            maxRotation: 45,
+            font: { size: 11 }
+          }
+        },
+        y: {
+          beginAtZero: false,
+          ticks: { font: { size: 11 } }
+        }
+      }
+    }
+  });
+  {% endif %}
+})();
 </script>
 {% endblock %}
