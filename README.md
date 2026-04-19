@@ -4,7 +4,7 @@
 |-------|
 | Parrot2CZE |
 
-[![codecov](https://codecov.io/gh/[GITHUB_USERNAME]/[REPO_NAME]/graph/badge.svg?token=[CODECOV_TOKEN])](https://codecov.io/gh/[GITHUB_USERNAME]/[REPO_NAME])
+[![codecov](https://codecov.io/github/Parrot2CZE/MTI-STIN/graph/badge.svg?token=LU3IBTK8R9)](https://codecov.io/github/Parrot2CZE/MTI-STIN)
 
 **[Odkaz na nasazené řešení](https://stin-exchange-rate-cgbce4cthth0d4b5.francecentral-01.azurewebsites.net/) 💱**
 
