@@ -1,3 +1,10 @@
+import sys
+import os
+from pathlib import Path
+
+# Přidá parent adresář do sys.path, aby pytest mohl najít modul 'app'
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import pytest
 from app import create_app
 

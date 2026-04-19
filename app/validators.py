@@ -6,12 +6,11 @@ from __future__ import annotations
 import re
 from datetime import date
 
-
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 
 
 def _allowed_currencies() -> list[str]:
-    """Načte povolené měny z config.yml (lazy import kvůli Flask kontextu)."""
+    """Načte povolené měny z config.yml."""
     from app.app_config_loader import get_all_currencies
     return get_all_currencies()
 

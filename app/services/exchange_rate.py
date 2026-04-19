@@ -20,7 +20,7 @@ class ExchangeRateService:
 
     Výkonnostní strategie:
     - average_rates() používá /timeframe — 1 request místo N×/historical
-    - Cache: aktuální kurzy dle config.yml, historická data 24 hodin, průměry dle config.yml
+    - Cache: aktuální kurzy dle config.yml, historická data 24 hodin
     """
 
     def _base_url(self) -> str:
@@ -204,8 +204,7 @@ class ExchangeRateService:
 
         result: dict[str, dict[str, float]] = {}
         for day_str, day_raw in raw_by_date.items():
-            # Každý den normalizujeme stejnou logikou
-            day_data = {"quotes": day_raw} if not isinstance(day_raw, dict) or "rates" not in day_raw else {"rates": day_raw}
+            day_data = {"quotes": day_raw} if "rates" not in day_raw else {"rates": day_raw}
             normalized = self._normalize_to_base(day_data, base, symbols)
             result[day_str] = normalized.get("rates") or {}
 
@@ -213,10 +212,7 @@ class ExchangeRateService:
 
     def _normalize_to_base(self, data: dict, base: str,
                             symbols: Optional[list[str]]) -> dict:
-        """
-        Společná cross-rate logika pro všechny endpointy.
-        API vždy vrací USD jako zdroj — přepočítáme na požadovaný base.
-        """
+        """Společná cross-rate logika pro všechny endpointy."""
         usd_rates = self._extract_rates(data, "USD")
 
         if base == "USD":
@@ -276,7 +272,11 @@ class ExchangeRateService:
                     if attempt < retries:
                         time.sleep(2 ** attempt)
                         continue
+                    # Všechny pokusy vyčerpány — vrať srozumitelnou chybu
+                    raise ExchangeRateError("Rate limit exceeded, zkus to za chvíli znovu.")
                 resp.raise_for_status()
+            except ExchangeRateError:
+                raise
             except requests.RequestException as exc:
                 raise ExchangeRateError(f"Request failed: {exc}") from exc
 

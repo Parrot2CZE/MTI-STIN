@@ -40,8 +40,7 @@ def test_currency_list_empty_raises():
 
 
 def test_valid_date():
-    d = validate_date("2024-01-15")
-    assert d == date(2024, 1, 15)
+    assert validate_date("2024-01-15") == date(2024, 1, 15)
 
 
 def test_invalid_date_format():

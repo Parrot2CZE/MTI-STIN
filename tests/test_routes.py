@@ -1,18 +1,16 @@
 import responses as rsps_lib
 
-# /live vrací USD quotes s prefixem
 FAKE_LIVE = {
     "success": True,
     "source": "USD",
-    "quotes": {"USDEUR": 0.04, "USDUSD": 1.0, "USDCZK": 1.0},
+    "quotes": {"USDUSD": 1.0, "USDEUR": 0.92, "USDCZK": 23.5},
 }
 
-# /timeframe pro average_rates
 FAKE_TIMEFRAME = {
     "success": True,
     "quotes": {
-        "2024-01-14": {"USDEUR": 0.041, "USDUSD": 1.0},
-        "2024-01-15": {"USDEUR": 0.040, "USDUSD": 1.0},
+        "2024-01-14": {"USDEUR": 0.91, "USDCZK": 23.1},
+        "2024-01-15": {"USDEUR": 0.92, "USDCZK": 23.5},
     },
 }
 
@@ -27,7 +25,7 @@ def test_index_get(client):
 def test_index_post_valid(client):
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", json=FAKE_LIVE)
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/timeframe", json=FAKE_TIMEFRAME)
-    r = client.post("/", data={"base": "USD", "symbols": ["EUR"], "days": "2"})
+    r = client.post("/", data={"base": "USD", "symbols": ["EUR", "CZK"], "days": "2"})
     assert r.status_code == 200
     assert b"EUR" in r.data
 

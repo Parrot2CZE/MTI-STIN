@@ -1,5 +1,4 @@
 # Konfigurace měnové aplikace
-# -------------------------------------------------------
 # Tajné hodnoty (SECRET_KEY, EXCHANGERATE_API_KEY) patří do .env, ne sem.
 
 currencies:
@@ -40,8 +39,8 @@ currencies:
     - INR
 
 cache:
-  timeout_seconds: 1200          # aktuální kurzy — 20 minut
-  timeout_seconds_dev: 300       # při vývoji — 5 minut
+  timeout_seconds: 1200       # aktuální kurzy — 20 minut
+  timeout_seconds_dev: 300    # při vývoji — 5 minut
 
 rate_limit:
   default: "60 per minute"

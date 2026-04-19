@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from app.services import ExchangeRateService, ExchangeRateError
 from app.extensions import limiter, cache
+from app.app_config_loader import get_cache_timeout
 
 api_bp = Blueprint("api", __name__)
 
@@ -11,7 +12,7 @@ def _svc() -> ExchangeRateService:
 
 @api_bp.route("/latest")
 @limiter.limit("30 per minute")
-@cache.cached(timeout=1200, query_string=True)
+@cache.cached(timeout=get_cache_timeout(), query_string=True)
 def latest():
     base = request.args.get("base", "USD").upper()
     symbols = request.args.get("symbols", "")
@@ -25,7 +26,7 @@ def latest():
 
 @api_bp.route("/strongest")
 @limiter.limit("30 per minute")
-@cache.cached(timeout=1200, query_string=True)
+@cache.cached(timeout=get_cache_timeout(), query_string=True)
 def strongest():
     base = request.args.get("base", "USD").upper()
     symbols = [s.strip() for s in request.args.get("symbols", "").split(",") if s.strip()]
@@ -40,7 +41,7 @@ def strongest():
 
 @api_bp.route("/weakest")
 @limiter.limit("30 per minute")
-@cache.cached(timeout=1200, query_string=True)
+@cache.cached(timeout=get_cache_timeout(), query_string=True)
 def weakest():
     base = request.args.get("base", "USD").upper()
     symbols = [s.strip() for s in request.args.get("symbols", "").split(",") if s.strip()]
@@ -55,7 +56,7 @@ def weakest():
 
 @api_bp.route("/average")
 @limiter.limit("20 per minute")
-@cache.cached(timeout=1200, query_string=True)
+@cache.cached(timeout=get_cache_timeout(), query_string=True)
 def average():
     base = request.args.get("base", "USD").upper()
     symbols = [s.strip() for s in request.args.get("symbols", "").split(",") if s.strip()]
