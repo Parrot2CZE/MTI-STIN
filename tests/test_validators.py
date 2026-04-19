@@ -1,9 +1,17 @@
 import pytest
 from datetime import date, timedelta
+from app import create_app
 from app.validators import (
     validate_currency, validate_currency_list,
     validate_date, validate_date_range, ValidationError,
 )
+
+
+@pytest.fixture(autouse=True)
+def app_ctx():
+    app = create_app("testing")
+    with app.app_context():
+        yield
 
 
 def test_valid_currency():

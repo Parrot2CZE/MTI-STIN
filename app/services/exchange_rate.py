@@ -20,7 +20,7 @@ class ExchangeRateService:
 
     Výkonnostní strategie:
     - average_rates() používá /timeframe — 1 request místo N×/historical
-    - Cache: aktuální kurzy 20 min, historická data 24 hodin, průměry 20 min
+    - Cache: aktuální kurzy dle config.yml, historická data 24 hodin, průměry dle config.yml
     """
 
     def _base_url(self) -> str:
@@ -38,7 +38,7 @@ class ExchangeRateService:
     # ------------------------------------------------------------------
 
     def get_latest(self, base: str = "USD", symbols: Optional[list[str]] = None) -> dict:
-        """Vrátí aktuální kurzy. Cachováno podle config.yml."""
+        """Vrátí aktuální kurzy pro *base*. Cachováno dle config.yml."""
         cache_key = f"latest:{base}:{','.join(sorted(symbols)) if symbols else 'all'}"
         cached = self._cache().get(cache_key)
         if cached is not None:
@@ -63,7 +63,7 @@ class ExchangeRateService:
         """
         Vrátí kurzy pro celé období jedním API requestem (/timeframe).
         Výsledek: { "2024-01-01": { "EUR": 0.92, ... }, ... }
-        Cachováno 24 hodin (historická data se nemění).
+        Cachováno 24 hodin.
         """
         cache_key = f"tf:{start.isoformat()}:{end.isoformat()}:{base}:{','.join(sorted(symbols)) if symbols else 'all'}"
         cached = self._cache().get(cache_key)
@@ -78,7 +78,10 @@ class ExchangeRateService:
     # ------------------------------------------------------------------
 
     def strongest_currency(self, base: str, symbols: list[str]) -> tuple[str, float]:
-        """FR2 — nejsilnější měna = nejnižší kurz vůči base."""
+        """
+        FR2 — nejsilnější měna vůči základní.
+        Nejsilnější = nejnižší kurz = za 1 base dostanete nejméně cizí měny.
+        """
         fetch = [s for s in symbols if s != base]
         if not fetch:
             raise ExchangeRateError("Žádné porovnávané měny (po vyloučení základní měny).")
@@ -89,7 +92,10 @@ class ExchangeRateService:
         return min(rates.items(), key=lambda x: x[1])
 
     def weakest_currency(self, base: str, symbols: list[str]) -> tuple[str, float]:
-        """FR3 — nejslabší měna = nejvyšší kurz vůči base."""
+        """
+        FR3 — nejslabší měna vůči základní.
+        Nejslabší = nejvyšší kurz = za 1 base dostanete nejvíce cizí měny.
+        """
         fetch = [s for s in symbols if s != base]
         if not fetch:
             raise ExchangeRateError("Žádné porovnávané měny (po vyloučení základní měny).")
@@ -103,14 +109,13 @@ class ExchangeRateService:
         """
         FR4 — aritmetický průměr kurzů za posledních N dní.
 
-        Používá /timeframe endpoint = 1 HTTP request pro celé období.
-        Výrazně rychlejší než N×/historical.
-        Pokud /timeframe selže (není na plánu), fallback na /historical s cache.
+        Primárně používá /timeframe (1 request pro celé období).
+        Pokud /timeframe selže, automatický fallback na /historical.
+        Měna shodná s base má vždy kurz 1.0.
         """
         if days < 1 or days > 365:
             raise ExchangeRateError("Počet dní musí být v rozsahu 1–365.")
 
-        # Cache pro celý výsledek average_rates
         same_as_base = [s for s in symbols if s == base]
         fetch_symbols = [s for s in symbols if s != base]
 
@@ -122,12 +127,11 @@ class ExchangeRateService:
         today = date.today()
         start = today - timedelta(days=days - 1)
 
-        result = {}
+        result: dict[str, float] = {}
         try:
-            daily = self.get_timeframe(start, today, base, fetch_symbols if fetch_symbols else None)
+            daily = self.get_timeframe(start, today, base, fetch_symbols or None)
             result = self._compute_averages(daily, fetch_symbols)
         except ExchangeRateError:
-            # Fallback: /historical pro každý den (pomalejší, ale spolehlivý)
             result = self._average_via_historical(base, fetch_symbols, days)
 
         for s in same_as_base:
@@ -154,7 +158,7 @@ class ExchangeRateService:
             params["symbols"] = ",".join(fetch_symbols)
 
         data = self._get("/live", params)
-        return self._normalize_to_base(data, base, symbols, "USD")
+        return self._normalize_to_base(data, base, symbols)
 
     def _fetch_historical(self, target_date: date, base: str,
                           symbols: Optional[list[str]]) -> dict:
@@ -174,14 +178,11 @@ class ExchangeRateService:
             params["symbols"] = ",".join(fetch_symbols)
 
         data = self._get("/historical", params)
-        return self._normalize_to_base(data, base, symbols, "USD")
+        return self._normalize_to_base(data, base, symbols)
 
     def _fetch_timeframe(self, start: date, end: date, base: str,
                          symbols: Optional[list[str]]) -> dict[str, dict[str, float]]:
-        """
-        Stáhne kurzy pro celé období jedním requestem.
-        Vrátí { "2024-01-01": { "EUR": 0.92, ... }, ... } — již s cross-rate přepočtem.
-        """
+        """1 request pro celé období. Vrátí { "YYYY-MM-DD": { "EUR": 0.92, ... }, ... }"""
         fetch_symbols: Optional[list[str]] = None
         if symbols:
             if base != "USD":
@@ -199,28 +200,24 @@ class ExchangeRateService:
             params["symbols"] = ",".join(fetch_symbols)
 
         data = self._get("/timeframe", params)
-
-        # /timeframe vrací { "quotes": { "2024-01-01": { "USDEUR": 0.92, ... }, ... } }
         raw_by_date = data.get("quotes") or data.get("rates") or {}
 
         result: dict[str, dict[str, float]] = {}
-        for day_str, day_data in raw_by_date.items():
-            # Normalizuj každý den stejnou logikou jako /historical
-            normalized = self._normalize_to_base(
-                {"quotes": day_data} if not day_data.get("rates") else {"rates": day_data},
-                base, symbols, "USD"
-            )
+        for day_str, day_raw in raw_by_date.items():
+            # Každý den normalizujeme stejnou logikou
+            day_data = {"quotes": day_raw} if not isinstance(day_raw, dict) or "rates" not in day_raw else {"rates": day_raw}
+            normalized = self._normalize_to_base(day_data, base, symbols)
             result[day_str] = normalized.get("rates") or {}
 
         return result
 
     def _normalize_to_base(self, data: dict, base: str,
-                            symbols: Optional[list[str]], api_source: str) -> dict:
+                            symbols: Optional[list[str]]) -> dict:
         """
-        Společná cross-rate logika pro /live, /historical i /timeframe.
-        Vždy předpokládá USD jako zdroj dat z API.
+        Společná cross-rate logika pro všechny endpointy.
+        API vždy vrací USD jako zdroj — přepočítáme na požadovaný base.
         """
-        usd_rates = self._extract_rates(data, api_source)
+        usd_rates = self._extract_rates(data, "USD")
 
         if base == "USD":
             if symbols:
@@ -256,7 +253,7 @@ class ExchangeRateService:
 
     def _average_via_historical(self, base: str, fetch_symbols: list[str],
                                  days: int) -> dict[str, float]:
-        """Fallback: průměr přes N×get_historical (pomalejší)."""
+        """Fallback: průměr přes N×get_historical."""
         accumulator: dict[str, list[float]] = {s: [] for s in fetch_symbols}
         today = date.today()
         for offset in range(days):

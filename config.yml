@@ -1,9 +1,9 @@
 # Konfigurace měnové aplikace
 # -------------------------------------------------------
-# Zde můžeš upravovat dostupné měny a chování aplikace.
+# Tajné hodnoty (SECRET_KEY, EXCHANGERATE_API_KEY) patří do .env, ne sem.
 
 currencies:
-  # Měny dostupné jako Základní měna (base)
+  # Měny dostupné jako Základní měna
   base:
     - USD
     - EUR
@@ -40,10 +40,11 @@ currencies:
     - INR
 
 cache:
-  # Jak dlouho cachovat kurzy v sekundách (výchozí: 1200 = 20 minut)
-  timeout_seconds: 1200
+  timeout_seconds: 1200          # aktuální kurzy — 20 minut
+  timeout_seconds_dev: 300       # při vývoji — 5 minut
 
-performance:
-  # Počet paralelních vláken pro stahování historických dat
-  # Vyšší = rychlejší, ale více souběžných API requestů
-  historical_threads: 7
+rate_limit:
+  default: "60 per minute"
+
+api:
+  base_url: "https://api.exchangerate.host"

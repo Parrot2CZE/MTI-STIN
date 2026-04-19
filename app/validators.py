@@ -2,16 +2,18 @@
 Centralizovaná validace vstupů (ochrana proti injection, neplatným hodnotám).
 """
 from __future__ import annotations
+
 import re
 from datetime import date
 
-# Povolené kódy měn – pouze 3 velká písmena ISO 4217
+
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 
-AVAILABLE_CURRENCIES = [
-    "USD", "EUR", "GBP", "JPY", "CHF", "CZK", "PLN", "HUF",
-    "CAD", "AUD", "SEK", "NOK", "DKK", "CNY", "INR",
-]
+
+def _allowed_currencies() -> list[str]:
+    """Načte povolené měny z config.yml (lazy import kvůli Flask kontextu)."""
+    from app.app_config_loader import get_all_currencies
+    return get_all_currencies()
 
 
 class ValidationError(ValueError):
@@ -19,11 +21,11 @@ class ValidationError(ValueError):
 
 
 def validate_currency(code: str) -> str:
-    """Ověří, že kód měny je platný 3-písmenný ISO kód ze seznamu."""
+    """Ověří, že kód měny je platný 3-písmenný ISO kód ze seznamu v config.yml."""
     code = code.strip().upper()
     if not _CURRENCY_RE.match(code):
         raise ValidationError(f"Neplatný kód měny: '{code}'")
-    if code not in AVAILABLE_CURRENCIES:
+    if code not in _allowed_currencies():
         raise ValidationError(f"Nepodporovaná měna: '{code}'")
     return code
 
@@ -46,7 +48,7 @@ def validate_date(value: str) -> date:
 
 
 def validate_date_range(start: str, end: str) -> tuple[date, date]:
-    """Ověří rozsah dat – start <= end, max 365 dní zpětně."""
+    """Ověří rozsah dat — start <= end, max 365 dní, ne v budoucnosti."""
     start_date = validate_date(start)
     end_date = validate_date(end)
     if start_date > end_date:
