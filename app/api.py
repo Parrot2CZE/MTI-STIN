@@ -1,6 +1,9 @@
-from flask import Blueprint, jsonify, request
+from functools import wraps
+from flask import Blueprint, jsonify, request, session
 from app.services import ExchangeRateService, ExchangeRateError
 from app.extensions import limiter, cache
+from app.app_config_loader import get_cache_timeout
+from app.logger import get_logs
 
 api_bp = Blueprint("api", __name__)
 
@@ -9,9 +12,19 @@ def _svc() -> ExchangeRateService:
     return ExchangeRateService()
 
 
+def login_required_api(f):
+    """Dekorátor — vrátí 401 pokud uživatel není přihlášen."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user" not in session:
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
 @api_bp.route("/latest")
 @limiter.limit("30 per minute")
-@cache.cached(timeout=1200, query_string=True)
+@cache.cached(timeout=get_cache_timeout(), query_string=True)
 def latest():
     base = request.args.get("base", "USD").upper()
     symbols = request.args.get("symbols", "")
@@ -25,7 +38,7 @@ def latest():
 
 @api_bp.route("/strongest")
 @limiter.limit("30 per minute")
-@cache.cached(timeout=1200, query_string=True)
+@cache.cached(timeout=get_cache_timeout(), query_string=True)
 def strongest():
     base = request.args.get("base", "USD").upper()
     symbols = [s.strip() for s in request.args.get("symbols", "").split(",") if s.strip()]
@@ -40,7 +53,7 @@ def strongest():
 
 @api_bp.route("/weakest")
 @limiter.limit("30 per minute")
-@cache.cached(timeout=1200, query_string=True)
+@cache.cached(timeout=get_cache_timeout(), query_string=True)
 def weakest():
     base = request.args.get("base", "USD").upper()
     symbols = [s.strip() for s in request.args.get("symbols", "").split(",") if s.strip()]
@@ -55,7 +68,7 @@ def weakest():
 
 @api_bp.route("/average")
 @limiter.limit("20 per minute")
-@cache.cached(timeout=1200, query_string=True)
+@cache.cached(timeout=get_cache_timeout(), query_string=True)
 def average():
     base = request.args.get("base", "USD").upper()
     symbols = [s.strip() for s in request.args.get("symbols", "").split(",") if s.strip()]
@@ -74,3 +87,11 @@ def average():
         return jsonify({"success": True, "base": base, "days": days, "averages": averages})
     except ExchangeRateError as exc:
         return jsonify({"success": False, "error": str(exc)}), 502
+
+
+@api_bp.route("/logs")
+@login_required_api
+@limiter.limit("20 per minute")
+def logs():
+    """Vrátí in-memory logy. Přístupný pouze přihlášeným uživatelům."""
+    return jsonify({"success": True, "logs": get_logs()})

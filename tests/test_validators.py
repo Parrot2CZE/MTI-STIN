@@ -1,9 +1,17 @@
 import pytest
 from datetime import date, timedelta
+from app import create_app
 from app.validators import (
     validate_currency, validate_currency_list,
     validate_date, validate_date_range, ValidationError,
 )
+
+
+@pytest.fixture(autouse=True)
+def app_ctx():
+    app = create_app("testing")
+    with app.app_context():
+        yield
 
 
 def test_valid_currency():
@@ -32,8 +40,7 @@ def test_currency_list_empty_raises():
 
 
 def test_valid_date():
-    d = validate_date("2024-01-15")
-    assert d == date(2024, 1, 15)
+    assert validate_date("2024-01-15") == date(2024, 1, 15)
 
 
 def test_invalid_date_format():
