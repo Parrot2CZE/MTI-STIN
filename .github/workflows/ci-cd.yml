@@ -92,14 +92,22 @@ jobs:
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_6E442F70FC17491BA11B210ED78FA17E }}
 
       - name: Nastavení API klíče na Azure
-        uses: azure/appservice-settings@v1
-        with:
-          app-name: "STIN-exchange-rate"
-          app-settings-json: '[{"name": "EXCHANGERATE_API_KEY", "value": "${{ secrets.EXCHANGERATE_API_KEY }}", "slotSetting": false}]'
+        run: |
+          RG=$(az webapp show --name "stin-exchange-rate" --query resourceGroup -o tsv)
+          az webapp config appsettings set \
+            --name "stin-exchange-rate" \
+            --resource-group "$RG" \
+            --settings \
+              "EXCHANGERATE_API_KEY=${{ secrets.EXCHANGERATE_API_KEY }}" \
+              "SCM_DO_BUILD_DURING_DEPLOYMENT=true"
+          az webapp config set \
+            --name "stin-exchange-rate" \
+            --resource-group "$RG" \
+            --startup-file "gunicorn --bind=0.0.0.0:8000 --workers=2 --timeout=120 run:app"
 
       - name: Deploy na Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: "STIN-exchange-rate"
+          app-name: "stin-exchange-rate"
           slot-name: "Production"
           package: .

@@ -30,12 +30,12 @@ jobs:
         run: |
           TOKEN=$(az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv)
           curl -X PUT \
-            "https://STIN-exchange-rate.scm.azurewebsites.net/api/vfs/site/wwwroot/config.yml" \
+            "https://stin-exchange-rate.scm.azurewebsites.net/api/vfs/site/wwwroot/config.yml" \
             -H "Authorization: Bearer ${TOKEN}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @config.yml
 
       - name: Restart Azure Web App
         run: |
-          RG=$(az webapp show --name "STIN-exchange-rate" --query resourceGroup -o tsv)
-          az webapp restart --name "STIN-exchange-rate" --resource-group "$RG"
+          RG=$(az webapp show --name "stin-exchange-rate" --query resourceGroup -o tsv)
+          az webapp restart --name "stin-exchange-rate" --resource-group "$RG"
