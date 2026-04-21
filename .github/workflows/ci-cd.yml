@@ -93,7 +93,7 @@ jobs:
 
       - name: Nastavení API klíče na Azure
         run: |
-          RG=$(az webapp show --name "stin-exchange-rate" --query resourceGroup -o tsv)
+          RG=$(az webapp list --query "[?name=='stin-exchange-rate'].resourceGroup" -o tsv)
           az webapp config appsettings set \
             --name "stin-exchange-rate" \
             --resource-group "$RG" \
