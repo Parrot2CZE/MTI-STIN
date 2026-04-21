@@ -18,7 +18,7 @@ jobs:
   # JOB 1: Testy + coverage report
   # ──────────────────────────────────────────────
   test:
-    name: 🧪 Build & Test
+    name: Build & Test
     runs-on: ubuntu-latest
 
     steps:
@@ -61,7 +61,7 @@ jobs:
   # JOB 2: Deploy na Azure (pouze push na main)
   # ──────────────────────────────────────────────
   deploy:
-    name: 🚀 Deploy na Azure
+    name: Deploy na Azure
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

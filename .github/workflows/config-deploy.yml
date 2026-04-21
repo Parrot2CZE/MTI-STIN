@@ -1,4 +1,4 @@
-name: 📦 Config Deploy — Azure restart
+name: Config Deploy — Azure restart
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   config-deploy:
-    name: 🔄 Deploy config.yml + restart
+    name: Deploy config.yml + restart
     runs-on: ubuntu-latest
     permissions:
       id-token: write
