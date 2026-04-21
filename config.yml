@@ -55,7 +55,7 @@ cache:
 rate_limit:
   default: "60 per minute"
   # Cooldown tlačítka "Zobrazit kurzy" v sekundách
-  button_cooldown_seconds: 30
+  button_cooldown_seconds: 60
 
 api:
   base_url: "https://api.exchangerate.host"
