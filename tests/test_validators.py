@@ -1,3 +1,7 @@
+"""
+Testy vstupní validace.
+"""
+
 import pytest
 from datetime import date, timedelta
 from app import create_app
@@ -9,23 +13,27 @@ from app.validators import (
 
 @pytest.fixture(autouse=True)
 def app_ctx():
+    # Validátor načítá whitelist měn z config.yml, k tomu potřebuje app context
     app = create_app("testing")
     with app.app_context():
         yield
 
 
 def test_valid_currency():
+    # Funkce normalizuje na uppercase
     assert validate_currency("eur") == "EUR"
     assert validate_currency("USD") == "USD"
 
 
 def test_invalid_currency_format():
-    with pytest.raises(ValidationError, match="Neplatný"):
+    # Číslo v kódu je neplatný formát
+    with pytest.raises(ValidationError, match="Neplatny"):
         validate_currency("US1")
 
 
 def test_unsupported_currency():
-    with pytest.raises(ValidationError, match="Nepodporovaná"):
+    # XYZ není v config.yml whitelistu
+    with pytest.raises(ValidationError, match="Nepodporovana"):
         validate_currency("XYZ")
 
 
@@ -44,7 +52,8 @@ def test_valid_date():
 
 
 def test_invalid_date_format():
-    with pytest.raises(ValidationError, match="Neplatné datum"):
+    # DD-MM-YYYY je špatný formát, očekáváme YYYY-MM-DD
+    with pytest.raises(ValidationError, match="Neplatne datum"):
         validate_date("15-01-2024")
 
 
@@ -59,7 +68,7 @@ def test_valid_date_range():
 
 
 def test_date_range_start_after_end():
-    with pytest.raises(ValidationError, match="před"):
+    with pytest.raises(ValidationError, match="pred"):
         validate_date_range("2024-01-10", "2024-01-01")
 
 

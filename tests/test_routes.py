@@ -1,3 +1,7 @@
+"""
+Testy UI rout — renderování šablon, zpracování formuláře, flash zprávy.
+"""
+
 import responses as rsps_lib
 
 FAKE_LIVE = {
@@ -44,7 +48,6 @@ def test_index_post_valid(auth_client):
 def test_index_post_no_symbols(auth_client):
     r = auth_client.post("/", data={"base": "USD", "symbols": [], "days": "7"})
     assert r.status_code == 200
-    # Zpráva může být v češtině nebo angličtině podle session
     assert "alespoň".encode("utf-8") in r.data or b"least" in r.data
 
 
@@ -76,3 +79,15 @@ def test_lang_switch_cs(auth_client):
 def test_lang_switch_en(auth_client):
     r = auth_client.get("/lang/en", follow_redirects=True)
     assert r.status_code == 200
+
+
+def test_404_returns_correct_status(auth_client):
+    """Handler musí vrátit HTTP 404, ne 200 s chybovou stránkou."""
+    r = auth_client.get("/neexistujici-stranka")
+    assert r.status_code == 404
+
+
+def test_404_renders_template(auth_client):
+    """Šablona 404.html musí být renderována — ověříme přítomnost čísla 404 v obsahu."""
+    r = auth_client.get("/neexistujici-stranka")
+    assert b"404" in r.data

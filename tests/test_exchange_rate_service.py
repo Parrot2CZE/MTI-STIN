@@ -1,8 +1,18 @@
+"""
+Testy ExchangeRateService — unit testy service vrstvy bez HTTP.
+
+Všechny testy mockují HTTP přes @responses.activate, takže nepotřebují
+síť ani platný API klíč. app_ctx fixture zajišťuje Flask app context,
+který service potřebuje pro přístup k cache a config.
+"""
+
 import pytest
 import responses as rsps_lib
 from datetime import date
 from app import create_app
 from app.services import ExchangeRateService, ExchangeRateError
+
+# --- Test data ---
 
 FAKE_LIVE_USD_BASE = {
     "success": True,
@@ -52,7 +62,8 @@ def app_ctx():
         yield
 
 
-# _extract_rates
+# --- _extract_rates ---
+
 def test_extract_rates_plain_keys():
     assert ExchangeRateService._extract_rates({"rates": {"EUR": 0.92}}, "USD") == {"EUR": 0.92}
 
@@ -67,11 +78,13 @@ def test_extract_rates_no_base():
     assert ExchangeRateService._extract_rates({"rates": {"EUR": 0.92}}) == {"EUR": 0.92}
 
 def test_extract_rates_float_cast():
+    # API občas vrátí číslo jako string, musíme castovat na float
     result = ExchangeRateService._extract_rates({"rates": {"EUR": "0.92"}}, "USD")
     assert isinstance(result["EUR"], float)
 
 
-# get_latest — USD base
+# --- get_latest ---
+
 @rsps_lib.activate
 def test_get_latest_usd_base():
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", json=FAKE_LIVE_USD_BASE)
@@ -86,17 +99,20 @@ def test_get_latest_raises_on_http_error():
 
 @rsps_lib.activate
 def test_get_latest_raises_on_api_error():
+    # API vrátí HTTP 200, ale success=false (neplatný klíč apod.)
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live",
                  json={"success": False, "error": {"info": "invalid key"}})
     with pytest.raises(ExchangeRateError, match="invalid key"):
         ExchangeRateService().get_latest("USD")
 
 
-# get_latest — EUR base (cross-rate)
+# --- Cross-rate výpočty pro non-USD base ---
+
 @rsps_lib.activate
 def test_get_latest_eur_base_cross_rate():
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", json=FAKE_LIVE_FOR_EUR_BASE)
     rates = ExchangeRateService().get_latest("EUR", ["CZK", "GBP"])["rates"]
+    # EUR->CZK = USD->CZK / USD->EUR = 23.5 / 0.92
     assert abs(rates["CZK"] - (23.5 / 0.92)) < 0.01
     assert abs(rates["GBP"] - (0.79 / 0.92)) < 0.01
 
@@ -114,13 +130,15 @@ def test_get_latest_usd_in_symbols_non_usd_base():
 
 @rsps_lib.activate
 def test_get_latest_missing_base_raises():
+    # API nevrátilo kurz pro základní měnu -> cross-rate nelze spočítat
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live",
                  json={"success": True, "quotes": {"USDCZK": 23.5}})
     with pytest.raises(ExchangeRateError, match="EUR"):
         ExchangeRateService().get_latest("EUR", ["CZK"])
 
 
-# get_historical
+# --- get_historical ---
+
 @rsps_lib.activate
 def test_get_historical_usd_base():
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/historical", json=FAKE_HISTORICAL_USD)
@@ -136,7 +154,8 @@ def test_get_historical_eur_base_cross_rate():
     assert "EUR" not in data["rates"]
 
 
-# FR2 — strongest
+# --- FR2: strongest ---
+
 @rsps_lib.activate
 def test_strongest_usd_base():
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", json=FAKE_LIVE_USD_BASE)
@@ -157,11 +176,13 @@ def test_strongest_empty_rates_raises():
         ExchangeRateService().strongest_currency("USD", ["EUR"])
 
 def test_strongest_only_base_raises():
+    # Pokud symbols obsahuje jen základní měnu, není co porovnávat
     with pytest.raises(ExchangeRateError):
         ExchangeRateService().strongest_currency("USD", ["USD"])
 
 
-# FR3 — weakest
+# --- FR3: weakest ---
+
 @rsps_lib.activate
 def test_weakest_usd_base():
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", json=FAKE_LIVE_USD_BASE)
@@ -179,11 +200,13 @@ def test_weakest_only_base_raises():
         ExchangeRateService().weakest_currency("USD", ["USD"])
 
 
-# FR4 — average_rates
+# --- FR4: average_rates ---
+
 @rsps_lib.activate
 def test_average_rates_uses_timeframe():
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/timeframe", json=FAKE_TIMEFRAME)
     averages = ExchangeRateService().average_rates("USD", ["EUR", "CZK"], days=2)
+    # (0.91 + 0.92) / 2 = 0.915
     assert abs(averages["EUR"] - 0.915) < 0.001
 
 @rsps_lib.activate
@@ -201,6 +224,7 @@ def test_average_rates_base_in_symbols_returns_1():
 
 @rsps_lib.activate
 def test_average_rates_fallback_to_historical():
+    # Timeframe selže -> fallback na historical per den
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/timeframe", status=500)
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/historical",
                  json=FAKE_HISTORICAL_USD)
@@ -209,6 +233,7 @@ def test_average_rates_fallback_to_historical():
 
 @rsps_lib.activate
 def test_average_rates_skips_failed_days_in_fallback():
+    # Všechny historical requesty selhají -> výsledek 0.0 (prázdný průměr)
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/timeframe", status=500)
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/historical", status=500)
     averages = ExchangeRateService().average_rates("USD", ["EUR"], days=1)
@@ -227,9 +252,11 @@ def test_average_rates_invalid_days_negative():
         ExchangeRateService().average_rates("USD", ["EUR"], days=-1)
 
 
-# Retry / rate limit
+# --- Retry / rate limit ---
+
 @rsps_lib.activate
 def test_rate_limit_retry_then_success():
+    # První request vrátí 429, druhý uspěje — retry mechanismus musí fungovat
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", status=429)
     rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", json=FAKE_LIVE_USD_BASE)
     data = ExchangeRateService().get_latest("USD")
@@ -237,6 +264,7 @@ def test_rate_limit_retry_then_success():
 
 @rsps_lib.activate
 def test_rate_limit_all_retries_exhausted():
+    # Všechny pokusy vrátí 429 -> ExchangeRateError
     for _ in range(3):
         rsps_lib.add(rsps_lib.GET, "https://api.exchangerate.host/live", status=429)
     with pytest.raises(ExchangeRateError, match="Rate limit"):

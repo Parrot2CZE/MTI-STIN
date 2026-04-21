@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}404 – {{ t.title }}{% endblock %}
+
+{% block content %}
+<div class="text-center mt-5">
+  <h1 class="display-1 fw-bold text-primary">404</h1>
+  <p class="fs-4 text-muted mb-4">Stránka nenalezena.</p>
+  <a href="{{ url_for('main.index') }}" class="btn btn-primary">
+    &larr; Zpět na hlavní stránku
+  </a>
+</div>
+{% endblock %}

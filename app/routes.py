@@ -1,3 +1,10 @@
+"""
+UI blueprint — HTML routy pro prohlížeč.
+
+Veškeré výpočty deleguje na ExchangeRateService; tady se jen
+zpracovává formulář, ukládá výsledek do session a renderují šablony.
+"""
+
 from flask import (Blueprint, render_template, request, flash,
                    redirect, url_for, session)
 from app.services import ExchangeRateService, ExchangeRateError
@@ -9,16 +16,19 @@ main_bp = Blueprint("main", __name__)
 
 
 def _lang() -> str:
+    """Vrátí aktuální jazyk ze session, výchozí čeština."""
     return session.get("lang", "cs")
 
 
 def _t() -> dict:
+    """Zkratka pro získání překladového slovníku aktuálního jazyka."""
     return get_i18n(_lang())
 
 
 @main_bp.route("/login", methods=["GET", "POST"])
 def login():
     t = _t()
+    # Přihlášený uživatel na login stránce nemá co dělat
     if is_logged_in():
         return redirect(url_for("main.index"))
     error = None
@@ -36,12 +46,14 @@ def login():
 @main_bp.route("/logout")
 def logout():
     logout_user()
+    # Smažeme i uložený výsledek, aby ho neviděl případný další uživatel na stejném PC
     session.pop("last_result", None)
     return redirect(url_for("main.login"))
 
 
 @main_bp.route("/lang/<lang>")
 def set_lang(lang: str):
+    """Přepne jazyk a vrátí uživatele zpět na stránku, ze které přišel."""
     if lang in get_supported_languages():
         session["lang"] = lang
     return redirect(request.referrer or url_for("main.index"))
@@ -57,7 +69,7 @@ def index():
     compare_currencies = get_compare_currencies()
     cooldown = get_button_cooldown()
 
-    # Obnov poslední výsledek ze session (zachová data při přepnutí jazyka)
+    # Výsledek předchozího dotazu se drží v session, aby přežil přepnutí jazyka
     saved_result = session.get("last_result")
 
     context = {
@@ -98,7 +110,7 @@ def index():
             weakest = svc.weakest_currency(base, selected)
             averages = svc.average_rates(base, selected, days)
 
-            # Denní data pro spojnicový graf
+            # Denní data pro spojnicový graf — samostatné volání, selhání nevadí
             from datetime import date, timedelta
             today = date.today()
             start = today - timedelta(days=days - 1)
@@ -106,6 +118,7 @@ def index():
                 daily = svc.get_timeframe(start, today, base,
                                           [s for s in selected if s != base] or None)
             except Exception:
+                # Graf je nice-to-have, bez dat ho prostě nevykreslíme
                 daily = {}
 
             result = {
@@ -116,7 +129,6 @@ def index():
                 "daily": daily,
                 "days": days,
             }
-            # Ulož do session — zachová se při přepnutí jazyka
             session["last_result"] = result
             context["result"] = result
 
@@ -126,3 +138,15 @@ def index():
             flash(f"{t.get('err_api')}: {exc}", "danger")
 
     return render_template("index.html", **context)
+
+
+@main_bp.app_errorhandler(404)
+def not_found(e):
+    """
+    Globální handler pro 404.
+    Používáme app_errorhandler místo errorhandler — ten funguje napříč
+    celou aplikací, nejen v rámci tohoto blueprintu.
+    """
+    t = _t()
+    return render_template("404.html", t=t, lang=_lang(),
+                           languages=get_supported_languages()), 404

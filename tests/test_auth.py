@@ -1,3 +1,7 @@
+"""
+Testy autentizace — přihlášení, odhlášení, ochrana rout.
+"""
+
 import pytest
 from app import create_app
 from app.auth import verify_password, is_logged_in
@@ -26,6 +30,7 @@ def test_verify_password_wrong():
 
 
 def test_verify_password_unknown_user():
+    # Neznámý uživatel musí vrátit False, ne vyhazovat výjimku
     assert verify_password("ghost", "anything") is False
 
 
@@ -64,5 +69,6 @@ def test_logs_api_returns_200_when_logged_in(client):
 def test_logout_clears_session(client):
     client.post("/login", data={"username": "admin", "password": "admin123"})
     client.get("/logout")
+    # Po odhlášení musí / přesměrovat na login
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 302
