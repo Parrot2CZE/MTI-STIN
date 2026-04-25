@@ -2,8 +2,8 @@
 Autentizace uživatelů.
 
 Session-based přihlášení s bcrypt hashy uloženými v config.yml.
-Žádná databáze — pro semestrální projekt postačí, v produkci by to chtělo
-minimálně SQLite nebo externí identity provider.
+Session je nastavena jako permanentní (přežije zavření prohlížeče),
+životnost řídí PERMANENT_SESSION_LIFETIME v config.py.
 """
 
 from __future__ import annotations
@@ -27,13 +27,18 @@ def verify_password(username: str, password: str) -> bool:
 
 
 def login_user(username: str) -> None:
-    """Zapíše username do session. Session není permanentní — expiruje zavřením prohlížeče."""
+    """
+    Zapíše username do session.
+    session.permanent = True znamená, že session přežije zavření prohlížeče —
+    životnost je omezena PERMANENT_SESSION_LIFETIME (výchozí 30 dní).
+    """
     session["user"] = username
-    session.permanent = False
+    session.permanent = True
 
 
 def logout_user() -> None:
     session.pop("user", None)
+    session.permanent = False
 
 
 def current_user() -> str | None:

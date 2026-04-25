@@ -3,6 +3,10 @@ UI blueprint — HTML routy pro prohlížeč.
 
 Veškeré výpočty deleguje na ExchangeRateService; tady se jen
 zpracovává formulář, ukládá výsledek do session a renderují šablony.
+
+Persistence: při přihlášení se načte last_result z user_store (JSON soubor),
+po úspěšném dotazu se uloží do session i do user_store. Výsledek tak přežije
+změnu prohlížeče i restart aplikace.
 """
 
 from flask import (Blueprint, render_template, request, flash,
@@ -11,6 +15,7 @@ from app.services import ExchangeRateService, ExchangeRateError
 from app.app_config_loader import (get_base_currencies, get_compare_currencies,
                                     get_i18n, get_supported_languages, get_button_cooldown)
 from app.auth import verify_password, login_user, logout_user, is_logged_in
+from app.user_store import load_user_state, save_user_state
 
 main_bp = Blueprint("main", __name__)
 
@@ -37,6 +42,12 @@ def login():
         password = request.form.get("password", "")
         if verify_password(username, password):
             login_user(username)
+
+            # --- Persistence: načti poslední výsledek uživatele ---
+            state = load_user_state(username)
+            if state.get("last_result"):
+                session["last_result"] = state["last_result"]
+
             return redirect(url_for("main.index"))
         error = t.get("login_error")
     return render_template("login.html", t=t, error=error, lang=_lang(),
@@ -45,8 +56,13 @@ def login():
 
 @main_bp.route("/logout")
 def logout():
+    # Před odhlášením ulož aktuální výsledek, aby byl dostupný při příštím přihlášení
+    username = session.get("user")
+    last_result = session.get("last_result")
+    if username and last_result:
+        save_user_state(username, {"last_result": last_result})
+
     logout_user()
-    # Smažeme i uložený výsledek, aby ho neviděl případný další uživatel na stejném PC
     session.pop("last_result", None)
     return redirect(url_for("main.login"))
 
@@ -69,7 +85,8 @@ def index():
     compare_currencies = get_compare_currencies()
     cooldown = get_button_cooldown()
 
-    # Výsledek předchozího dotazu se drží v session, aby přežil přepnutí jazyka
+    # Výsledek předchozího dotazu se drží v session (přežívá přepnutí jazyka)
+    # a je obnovován z user_store při každém přihlášení (přežívá změnu prohlížeče)
     saved_result = session.get("last_result")
 
     context = {
@@ -110,7 +127,7 @@ def index():
             weakest = svc.weakest_currency(base, selected)
             averages = svc.average_rates(base, selected, days)
 
-            # Denní data pro spojnicový graf — samostatné volání, selhání nevadí
+            # Denní data pro spojnicový graf
             from datetime import date, timedelta
             today = date.today()
             start = today - timedelta(days=days - 1)
@@ -118,7 +135,6 @@ def index():
                 daily = svc.get_timeframe(start, today, base,
                                           [s for s in selected if s != base] or None)
             except Exception:
-                # Graf je nice-to-have, bez dat ho prostě nevykreslíme
                 daily = {}
 
             result = {
@@ -129,8 +145,15 @@ def index():
                 "daily": daily,
                 "days": days,
             }
+
+            # Uložení do session (přežije přepnutí jazyka v tomto prohlížeči)
             session["last_result"] = result
             context["result"] = result
+
+            # --- Persistence: uložení do JSON souboru (přežije změnu prohlížeče) ---
+            username = session.get("user")
+            if username:
+                save_user_state(username, {"last_result": result})
 
         except ExchangeRateError as exc:
             from flask import current_app
@@ -142,11 +165,6 @@ def index():
 
 @main_bp.app_errorhandler(404)
 def not_found(e):
-    """
-    Globální handler pro 404.
-    Používáme app_errorhandler místo errorhandler — ten funguje napříč
-    celou aplikací, nejen v rámci tohoto blueprintu.
-    """
     t = _t()
     return render_template("404.html", t=t, lang=_lang(),
                            languages=get_supported_languages()), 404
