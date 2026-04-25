@@ -3,8 +3,14 @@ name: CI/CD — Build, Test & Deploy
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "config.yml"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "config.yml"
   workflow_dispatch:
 
 jobs:

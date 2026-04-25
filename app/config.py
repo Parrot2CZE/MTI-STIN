@@ -1,11 +1,12 @@
 """
-Flask konfigurace rozdělená do tří tříd podle prostředí.
+Flask konfigurace rozdělená do tříd podle prostředí.
 
 BaseConfig drží společné hodnoty. TestingConfig vypíná rate limiting
 a cache, aby testy nebyly závislé na stavu z předchozích testů.
 """
 
 import os
+from datetime import timedelta
 from app.app_config_loader import get_cache_timeout, get_rate_limit_default, get_api_base_url
 
 
@@ -18,6 +19,8 @@ class BaseConfig:
     RATELIMIT_STORAGE_URI = "memory://"
     CACHE_TYPE = "SimpleCache"
     CACHE_DEFAULT_TIMEOUT = get_cache_timeout()
+    # Session přežije zavření prohlížeče — platí 30 dní od posledního přihlášení
+    PERMANENT_SESSION_LIFETIME = timedelta(days=30)
 
 
 class DevelopmentConfig(BaseConfig):
@@ -25,6 +28,8 @@ class DevelopmentConfig(BaseConfig):
     TESTING = False
     # Kratší cache TTL v dev módu, aby změny kurzů byly vidět rychleji
     CACHE_DEFAULT_TIMEOUT = get_cache_timeout(dev=True)
+    # Kratší session životnost pro vývoj — snazší testování expirace
+    PERMANENT_SESSION_LIFETIME = timedelta(days=1)
 
 
 class TestingConfig(BaseConfig):
@@ -34,6 +39,8 @@ class TestingConfig(BaseConfig):
     RATELIMIT_ENABLED = False
     # NullCache znamená, že každý call do service jde přímo na (mockované) API
     CACHE_TYPE = "NullCache"
+    # Krátká lifetime pro testy
+    PERMANENT_SESSION_LIFETIME = timedelta(minutes=5)
 
 
 class ProductionConfig(BaseConfig):
