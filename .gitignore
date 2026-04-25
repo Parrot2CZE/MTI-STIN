@@ -38,3 +38,5 @@ logs/
 
 # Azure
 *.zip
+# User state persistence
+data/
