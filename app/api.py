@@ -1,3 +1,10 @@
+"""
+REST API blueprint — všechny /api/* endpointy.
+
+Odpovědi jsou vždy JSON. Rate limiting a cache se aplikují per-endpoint
+dekorátory, takže UI routy mají vlastní limity nezávisle.
+"""
+
 from functools import wraps
 from flask import Blueprint, jsonify, request, session
 from app.services import ExchangeRateService, ExchangeRateError
@@ -9,11 +16,15 @@ api_bp = Blueprint("api", __name__)
 
 
 def _svc() -> ExchangeRateService:
+    # Nová instance per request — stav žije v cache vrstvě, ne na objektu
     return ExchangeRateService()
 
 
 def login_required_api(f):
-    """Dekorátor — vrátí 401 pokud uživatel není přihlášen."""
+    """
+    Dekorátor pro chráněné API endpointy.
+    Vrátí 401 JSON místo redirectu — API by nemělo vracet HTML odpovědi.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user" not in session:
@@ -28,6 +39,7 @@ def login_required_api(f):
 def latest():
     base = request.args.get("base", "USD").upper()
     symbols = request.args.get("symbols", "")
+    # Split prázdného stringu dá [''], proto filtrujeme
     sym_list = [s.strip() for s in symbols.split(",") if s.strip()] or None
     try:
         data = _svc().get_latest(base, sym_list)
@@ -77,6 +89,7 @@ def average():
     if not symbols:
         return jsonify({"success": False, "error": "symbols param required"}), 400
 
+    # Validujeme days tady, detailnější range check je v service vrstvě
     try:
         days = int(raw_days)
     except ValueError:
@@ -93,5 +106,8 @@ def average():
 @login_required_api
 @limiter.limit("20 per minute")
 def logs():
-    """Vrátí in-memory logy. Přístupný pouze přihlášeným uživatelům."""
+    """
+    Vrátí in-memory logy z deque bufferu.
+    Endpoint je chráněný — systémové logy by neměly být veřejné.
+    """
     return jsonify({"success": True, "logs": get_logs()})

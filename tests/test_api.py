@@ -1,11 +1,20 @@
+"""
+Testy REST API endpointů (/api/*).
+
+Reálné HTTP requesty jsou interceptovány knihovnou responses,
+takže testy nepotřebují síťové připojení ani platný API klíč.
+"""
+
 import responses as rsps_lib
 
+# Simulovaná odpověď /live endpointu s USD-prefixovanými klíči (formát exchangerate.host)
 FAKE_LIVE = {
     "success": True,
     "source": "USD",
     "quotes": {"USDEUR": 0.92, "USDCZK": 23.5, "USDJPY": 149.0},
 }
 
+# Simulovaná odpověď /timeframe endpointu pro 2 dny
 FAKE_TIMEFRAME = {
     "success": True,
     "quotes": {
@@ -29,6 +38,7 @@ def test_api_strongest(auth_client):
     r = auth_client.get("/api/strongest?base=USD&symbols=EUR,CZK,JPY")
     assert r.status_code == 200
     data = r.get_json()
+    # EUR má nejnižší kurz (0.92) vůči USD -> je nejsilnější
     assert data["currency"] == "EUR"
     assert abs(data["rate"] - 0.92) < 0.001
 
@@ -39,6 +49,7 @@ def test_api_weakest(auth_client):
     r = auth_client.get("/api/weakest?base=USD&symbols=EUR,CZK,JPY")
     assert r.status_code == 200
     data = r.get_json()
+    # JPY má nejvyšší kurz (149.0) vůči USD -> je nejslabší
     assert data["currency"] == "JPY"
     assert abs(data["rate"] - 149.0) < 0.001
 
@@ -77,6 +88,7 @@ def test_api_average(auth_client):
 
 @rsps_lib.activate
 def test_api_average_days_out_of_range(auth_client):
+    # 400 dní je nad limitem 365 — service vyhodí ExchangeRateError -> 502
     r = auth_client.get("/api/average?base=USD&symbols=EUR&days=400")
     assert r.status_code == 502
 
