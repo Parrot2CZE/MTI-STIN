@@ -1,3 +1,10 @@
+"""
+Sdílené pytest fixtures.
+
+app() fixture vytváří novou instanci pro každý test, takže testy
+jsou izolované a nesdílí stav (session, cache, logy).
+"""
+
 import sys
 import os
 from pathlib import Path
@@ -21,7 +28,7 @@ def client(app):
 
 @pytest.fixture
 def auth_client(app):
-    """Test client already logged in as admin."""
+    """Test client s aktivní session admina — pro testy chráněných endpointů."""
     c = app.test_client()
     c.post("/login", data={"username": "admin", "password": "admin123"})
     return c

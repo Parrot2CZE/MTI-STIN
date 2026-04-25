@@ -1,3 +1,7 @@
+"""
+Testy in-memory loggeru.
+"""
+
 import pytest
 from app import create_app
 from app.logger import get_logs, _LOG_BUFFER
@@ -5,6 +9,7 @@ from app.logger import get_logs, _LOG_BUFFER
 
 @pytest.fixture(autouse=True)
 def clear_logs():
+    """Před každým testem vyprázdníme buffer, aby logy z jiných testů nekontaminovaly výsledky."""
     _LOG_BUFFER.clear()
     yield
     _LOG_BUFFER.clear()
@@ -18,7 +23,6 @@ def test_log_written_on_query():
     app = create_app("testing")
     with app.test_client() as client:
         client.post("/login", data={"username": "admin", "password": "admin123"})
-        # Trigger a query that would log — we just check the log endpoint works
         logs = get_logs()
         assert isinstance(logs, list)
 
