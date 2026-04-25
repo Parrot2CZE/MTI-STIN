@@ -40,4 +40,8 @@ def create_app(config_name: str = None) -> Flask:
     from app.api import api_bp
     app.register_blueprint(api_bp, url_prefix="/api")
 
+    # Error handlers (404, 500)
+    from app.errors import register_error_handlers
+    register_error_handlers(app)
+
     return app
