@@ -63,6 +63,7 @@ def logout():
         save_user_state(username, {"last_result": last_result})
 
     logout_user()
+    # Smažeme i uložený výsledek, aby ho neviděl případný další uživatel na stejném PC
     session.pop("last_result", None)
     return redirect(url_for("main.login"))
 
@@ -127,7 +128,7 @@ def index():
             weakest = svc.weakest_currency(base, selected)
             averages = svc.average_rates(base, selected, days)
 
-            # Denní data pro spojnicový graf
+            # Denní data pro spojnicový graf — samostatné volání, selhání nevadí
             from datetime import date, timedelta
             today = date.today()
             start = today - timedelta(days=days - 1)
@@ -135,6 +136,7 @@ def index():
                 daily = svc.get_timeframe(start, today, base,
                                           [s for s in selected if s != base] or None)
             except Exception:
+                # Graf je nice-to-have, bez dat ho prostě nevykreslíme
                 daily = {}
 
             result = {
